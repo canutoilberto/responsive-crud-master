@@ -7,6 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/database/firebaseConfig";
 import { Asset, AssetStatus } from "@/types/asset";
@@ -14,7 +16,7 @@ import { Asset, AssetStatus } from "@/types/asset";
 interface AssetStore {
   assets: Asset[];
   fetchAssets: () => Promise<void>;
-  addAsset: (newAsset: Omit<Asset, "id">) => Promise<void>;
+  addAsset: (newAsset: Omit<Asset, "id" | "createdAt">) => Promise<void>;
   updateAsset: (id: string, updatedFields: Partial<Asset>) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
 }
@@ -38,14 +40,21 @@ const useAssetStore = create<AssetStore>((set) => ({
         condition: data.condition || "",
         responsible: data.responsible || "",
         status: (data.status as AssetStatus) || "inactive",
+        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
       });
     });
     set({ assets: assetsData });
   },
-  addAsset: async (newAsset: Omit<Asset, "id">) => {
-    const docRef = await addDoc(collection(db, "assets"), newAsset);
+  addAsset: async (newAsset: Omit<Asset, "id" | "createdAt">) => {
+    const docRef = await addDoc(collection(db, "assets"), {
+      ...newAsset,
+      createdAt: serverTimestamp(), // Add server timestamp for createdAt
+    });
     set((state) => ({
-      assets: [...state.assets, { id: docRef.id, ...newAsset }],
+      assets: [
+        ...state.assets,
+        { id: docRef.id, ...newAsset, createdAt: new Date() }, // Assume current date for optimistic update
+      ],
     }));
   },
   updateAsset: async (id: string, updatedFields: Partial<Asset>) => {
