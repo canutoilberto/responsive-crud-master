@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Asset, mockAssets } from "@/types/asset";
+import { useEffect, useState } from "react";
+import useAssetStore from "@/store/assetStore";
+import { Asset } from "@/types/asset";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,7 +33,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 
 export default function Index() {
-  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+  const { assets, fetchAssets, addAsset, updateAsset, deleteAsset } =
+    useAssetStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -40,47 +42,64 @@ export default function Index() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
+
   const filteredAssets = assets.filter((asset) =>
     asset.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAdd = (data: Omit<Asset, "id">) => {
-    const newAsset: Asset = {
-      ...data,
-      id: Date.now().toString(),
-    };
-    setAssets((prev) => [...prev, newAsset]);
-    setIsAddModalOpen(false);
-    toast({
-      title: "Sucesso",
-      description: "Item adicionado com sucesso!",
-    });
+  const handleAdd = async (data: Omit<Asset, "id">) => {
+    try {
+      await addAsset(data);
+      setIsAddModalOpen(false);
+      toast({
+        title: "Sucesso",
+        description: "Item adicionado com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao adicionar o item.",
+      });
+    }
   };
 
-  const handleEdit = (data: Omit<Asset, "id">) => {
+  const handleEdit = async (data: Partial<Asset>) => {
     if (!selectedAsset) return;
-    setAssets((prev) =>
-      prev.map((asset) =>
-        asset.id === selectedAsset.id ? { ...data, id: asset.id } : asset
-      )
-    );
-    setIsEditModalOpen(false);
-    setSelectedAsset(null);
-    toast({
-      title: "Sucesso",
-      description: "Item atualizado com sucesso!",
-    });
+    try {
+      await updateAsset(selectedAsset.id, data);
+      setIsEditModalOpen(false);
+      setSelectedAsset(null);
+      toast({
+        title: "Sucesso",
+        description: "Item atualizado com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao atualizar o item.",
+      });
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedAsset) return;
-    setAssets((prev) => prev.filter((asset) => asset.id !== selectedAsset.id));
-    setIsDeleteDialogOpen(false);
-    setSelectedAsset(null);
-    toast({
-      title: "Sucesso",
-      description: "Item removido com sucesso!",
-    });
+    try {
+      await deleteAsset(selectedAsset.id);
+      setIsDeleteDialogOpen(false);
+      setSelectedAsset(null);
+      toast({
+        title: "Sucesso",
+        description: "Item removido com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Falha ao excluir o item.",
+      });
+    }
   };
 
   return (
@@ -140,7 +159,7 @@ export default function Index() {
                 <TableCell>{asset.condition}</TableCell>
                 <TableCell>{asset.responsible}</TableCell>
                 <TableCell>
-                  <StatusBadge status={asset.status} />
+                  <StatusBadge assetId={asset.status} />
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
@@ -177,10 +196,7 @@ export default function Index() {
           <DialogHeader>
             <DialogTitle>Adicionar Item</DialogTitle>
           </DialogHeader>
-          <AssetForm
-            onSubmit={handleAdd}
-            onCancel={() => setIsAddModalOpen(false)}
-          />
+          <AssetForm onCancel={() => setIsAddModalOpen(false)} />
         </DialogContent>
       </Dialog>
 
@@ -191,7 +207,6 @@ export default function Index() {
           </DialogHeader>
           <AssetForm
             initialData={selectedAsset || undefined}
-            onSubmit={handleEdit}
             onCancel={() => setIsEditModalOpen(false)}
           />
         </DialogContent>

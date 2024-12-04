@@ -10,14 +10,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
+import useAssetStore from "@/store/assetStore";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AssetFormProps {
   initialData?: Asset;
-  onSubmit: (data: Omit<Asset, "id">) => void;
   onCancel: () => void;
 }
 
-export function AssetForm({ initialData, onSubmit, onCancel }: AssetFormProps) {
+export function AssetForm({ initialData, onCancel }: AssetFormProps) {
+  const { addAsset, updateAsset } = useAssetStore();
+  const { toast } = useToast();
+
   const [formData, setFormData] = useState<Partial<Asset>>(
     initialData || {
       code: "",
@@ -33,9 +37,33 @@ export function AssetForm({ initialData, onSubmit, onCancel }: AssetFormProps) {
     }
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData as Omit<Asset, "id">);
+
+    try {
+      if (initialData) {
+        // Update existing asset
+        await updateAsset(initialData.id, formData as Partial<Asset>);
+        toast({
+          title: "Sucesso",
+          description: "Item atualizado com sucesso!",
+        });
+      } else {
+        // Add new asset
+        await addAsset(formData as Omit<Asset, "id">);
+        toast({
+          title: "Sucesso",
+          description: "Item adicionado com sucesso!",
+        });
+      }
+      onCancel(); // Close the modal or form
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao salvar o item.",
+      });
+      console.error(error);
+    }
   };
 
   const handleChange = (
@@ -147,10 +175,7 @@ export function AssetForm({ initialData, onSubmit, onCancel }: AssetFormProps) {
         </div>
         <div className="space-y-2">
           <Label htmlFor="status">Status</Label>
-          <Select
-            value={formData.status}
-            onValueChange={handleStatusChange}
-          >
+          <Select value={formData.status} onValueChange={handleStatusChange}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o status" />
             </SelectTrigger>
